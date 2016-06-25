@@ -1,0 +1,7 @@
+## Interface: 70000
+## Title: Advanced XP Bar
+## Notes: Yet another AddOn making things slightly more useful!
+## Author: Vladinator
+## Version: 7.0.0.160525
+## X-SavedVariables: AdvancedXPBarDB
+core.lua
