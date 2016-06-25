@@ -1,7 +1,3 @@
-Battle Pet Tabs
+Advanced XP Bar
 ==================
-You can create up to 10 team loadouts and toggle between them by pressing the tabs on the Pet Journal - could it get any simpler? You can also store your team compositions into a dropbox, and then easily swap between active and inactive teams!
-
-Warlords of Draenor
-------------------
-The addon has been reworked and released as early beta for WOD. Feedback regarding bugs and issues are encouraged.
+Have you ever wondered if you have completed enough quests to level up? Wonder no more! This addon notifies you when you have enough completed quests to level up. Your experience bar will show a green color indicating the amount of experience you have waiting for you once you deliver your completed quests. You will also be notified with sound and a banner on top of your screen!
