@@ -2,6 +2,6 @@
 ## Title: Advanced XP Bar
 ## Notes: Yet another AddOn making things slightly more useful!
 ## Author: Vladinator
-## Version: 7.0.0.160625
+## Version: 7.0.0.160702
 ## SavedVariables: AdvancedXPBarDB
 core.lua
