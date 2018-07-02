@@ -1,3 +1,5 @@
+local IS_BFA = select(4, GetBuildInfo()) >= 80000
+
 local addonName = ...
 local MAX_LEVEL = MAX_PLAYER_LEVEL_TABLE[#MAX_PLAYER_LEVEL_TABLE]
 
@@ -11,7 +13,7 @@ local defaults = {
 	-- true = only include watched quests, false = all quests regardless if watched or not
 	watched = true,
 	-- true = include remote zones, false = only quests in current zone
-	remote = false,
+	remote = true,
 	-- true = include incomplete quests, false = only completed quests
 	incomplete = false,
 	-- true = include bonus objectives (since we complete+turn in, we have to display the experience in advance), false = ignore bonus objectives
@@ -28,16 +30,17 @@ local config = defaults
 
 local manifest = {
 	{
+		-- default UI expbar
+		frame = "MainMenuExpBar",
+		level = IS_BFA and 1 or -1,
+	},
+	{
 		-- BEB
 		frame = "BEBBackground",
 	},
 	{
 		-- Dominos
 		frame = function() return type(Dominos) == "table" and type(Dominos.Frame) == "table" and type(Dominos.Frame.Get) == "function" and Dominos.Frame:Get("xp") end,
-	},
-	{
-		-- default UI expbar
-		frame = "MainMenuExpBar",
 	},
 	{
 		-- saftXP_Backdrop
@@ -132,7 +135,7 @@ do
 		popup:SetScript("OnShow", scripts.PopupShow)
 
 		popup:SetScript("OnEvent", scripts.PopupEvent)
-		popup:RegisterEvent("OnEvent", "PLAYER_LEVEL_UP")
+		popup:RegisterEvent("PLAYER_LEVEL_UP")
 
 		popup.PlayBanner = scripts.PlayBanner
 		popup.StopBanner = scripts.StopBanner
@@ -311,7 +314,7 @@ function ns:CalculateExperience()
 	while GetQuestLogTitle(index) do
 		SelectQuestLogEntry(index)
 
-		local title, level, suggestedGroup, isHeader, isCollapsed, isCompleted, frequency, questID, startEvent, displayQuestID, isOnMap, hasLocalPOI, isTask, isBounty, isStory = GetQuestLogTitle(index)
+		local title, level, suggestedGroup, isHeader, isCollapsed, isCompleted, frequency, questID, startEvent, displayQuestID, isOnMap, hasLocalPOI, isTask, isBounty, isStory, isHidden, isScaling = GetQuestLogTitle(index)
 		local isTracked, isRemote = IsQuestWatched(index), not ns.zone[questID]
 		isCompleted = (isCompleted and isCompleted > 0) or (GetNumQuestLeaderBoards(index) == 0 and playerMoney >= GetQuestLogRequiredMoney(index) and not startEvent)
 
@@ -348,7 +351,7 @@ function ns:UpdateEntry(entry)
 	local widget = entry.widget
 	local statusbar = entry.statusbar
 	statusbar:SetFrameStrata(widget:GetFrameStrata())
-	statusbar:SetFrameLevel(widget:GetFrameLevel() - 1)
+	statusbar:SetFrameLevel(max(widget:GetFrameLevel() + (entry.level or -1), 0))
 	statusbar:SetSize(widget:GetSize())
 	statusbar:SetStatusBarTexture(widget:GetStatusBarTexture() or config.texture)
 	statusbar:SetMinMaxValues(widget:GetMinMaxValues())
@@ -359,9 +362,9 @@ function ns:UpdateEntry(entry)
 		-- TODO: WIP
 		local exhaustionStateID = GetRestState()
 		if exhaustionStateID == 1 then
-			statusbar:SetStatusBarColor(0, .5, 1, 1)
+			statusbar:SetStatusBarColor(0.0, 0.39, 0.88, 1.0)
 		elseif exhaustionStateID == 2 then
-			statusbar:SetStatusBarColor(1, 0, 1, 1)
+			statusbar:SetStatusBarColor(0.58, 0.0, 0.55, 1.0)
 		else
 			statusbar:SetStatusBarColor(1, 1, 1, 1)
 		end
@@ -428,6 +431,8 @@ function ns:DisableAddOn()
 end
 
 function ns:ON_TOOLTIP()
+	if not GameTooltip:IsShown() then return end
+
 	local experience, canLevel, percent = ns:CalculateExperience()
 
 	local DEFAULT_NUM_BARS = 20
@@ -528,9 +533,25 @@ function ns:ADDON_LOADED(event, name)
 		-- apply hooks
 		hooksecurefunc("AddQuestWatch", ns.ON_EVENT)
 		hooksecurefunc("RemoveQuestWatch", ns.ON_EVENT)
-		-- TODO: per manifest entry?
-		hooksecurefunc("ExhaustionToolTipText", ns.ON_TOOLTIP)
-		ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
+
+		-- experience bar
+		if IS_BFA then
+			local hooked
+			hooksecurefunc(StatusTrackingBarManager, "AddBarFromTemplate", function(_, _, template)
+				if hooked or template ~= "ExpStatusBarTemplate" then return end
+				hooked = 1
+				local bars = StatusTrackingBarManager.bars
+				local xpbar = bars[#bars] -- it's always added at the end when this is called
+				hooksecurefunc(xpbar.ExhaustionTick, "ExhaustionToolTipText", ns.ON_TOOLTIP)
+				xpbar.ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
+				local entry = manifest[1] -- we keep the main xp bar on top of the manifest
+				ns:SetupBar(entry, xpbar.StatusBar)
+				entry.hooked = true
+			end)
+		else
+			hooksecurefunc("ExhaustionToolTipText", ns.ON_TOOLTIP)
+			ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
+		end
 	end
 
 	-- scan for supported addons
