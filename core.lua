@@ -1,4 +1,6 @@
-local IS_BFA = select(4, GetBuildInfo()) >= 80000
+if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
+	return
+end
 
 local addonName = ...
 local MAX_LEVEL = MAX_PLAYER_LEVEL_TABLE[#MAX_PLAYER_LEVEL_TABLE]
@@ -32,7 +34,7 @@ local manifest = {
 	{
 		-- default UI expbar
 		frame = "MainMenuExpBar",
-		level = IS_BFA and 1 or -1,
+		level = 1,
 	},
 	{
 		-- BEB
@@ -308,7 +310,9 @@ function ns:CalculateExperience()
 	local index, header = 1
 
 	-- updates what quests are for the current zone
-	ns:UpdateZone()
+	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+		ns:UpdateZone()
+	end
 
 	-- iterate over the quests
 	while GetQuestLogTitle(index) do
@@ -517,11 +521,14 @@ function ns:ADDON_LOADED(event, name)
 			"QUEST_LOG_UPDATE",
 			"QUEST_WATCH_LIST_CHANGED",
 			"SUPER_TRACKED_QUEST_CHANGED",
-			"UNIT_ENTERED_VEHICLE",
-			"UNIT_EXITED_VEHICLE",
 			"UNIT_PORTRAIT_UPDATE",
 			"ZONE_CHANGED_NEW_AREA",
 		}
+
+		if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
+			events[#events + 1] = "UNIT_ENTERED_VEHICLE"
+			events[#events + 1] = "UNIT_EXITED_VEHICLE"
+		end
 
 		-- register events
 		for i = 1, #events do
@@ -535,23 +542,18 @@ function ns:ADDON_LOADED(event, name)
 		hooksecurefunc("RemoveQuestWatch", ns.ON_EVENT)
 
 		-- experience bar
-		if IS_BFA then
-			local hooked
-			hooksecurefunc(StatusTrackingBarManager, "AddBarFromTemplate", function(_, _, template)
-				if hooked or template ~= "ExpStatusBarTemplate" then return end
-				hooked = 1
-				local bars = StatusTrackingBarManager.bars
-				local xpbar = bars[#bars] -- it's always added at the end when this is called
-				hooksecurefunc(xpbar.ExhaustionTick, "ExhaustionToolTipText", ns.ON_TOOLTIP)
-				xpbar.ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
-				local entry = manifest[1] -- we keep the main xp bar on top of the manifest
-				ns:SetupBar(entry, xpbar.StatusBar)
-				entry.hooked = true
-			end)
-		else
-			hooksecurefunc("ExhaustionToolTipText", ns.ON_TOOLTIP)
-			ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
-		end
+		local hooked
+		hooksecurefunc(StatusTrackingBarManager, "AddBarFromTemplate", function(_, _, template)
+			if hooked or template ~= "ExpStatusBarTemplate" then return end
+			hooked = 1
+			local bars = StatusTrackingBarManager.bars
+			local xpbar = bars[#bars] -- it's always added at the end when this is called
+			hooksecurefunc(xpbar.ExhaustionTick, "ExhaustionToolTipText", ns.ON_TOOLTIP)
+			xpbar.ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
+			local entry = manifest[1] -- we keep the main xp bar on top of the manifest
+			ns:SetupBar(entry, xpbar.StatusBar)
+			entry.hooked = true
+		end)
 	end
 
 	-- scan for supported addons
