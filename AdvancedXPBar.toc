@@ -1,8 +1,8 @@
-## Interface: 80205
+## Interface: 80300
 ## Title: Advanced XP Bar
 ## Notes: Yet another AddOn making things slightly more useful!
 ## Author: Vladinator
-## Version: 8.0.0.180630
+## Version: 8.3.0.200202
 ## SavedVariables: AdvancedXPBarDB
 ## X-Curse-Project-ID: 73746
 ## X-WoWI-ID: 18342
