@@ -2,8 +2,23 @@ if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
 	return
 end
 
+-- TODO: 9.0
+local GetQuestLogTitle = _G.GetQuestLogTitle or function(i)
+	local info = C_QuestLog.GetInfo(i)
+	if info then
+		local _
+		local isComplete = C_QuestLog.IsComplete(info.questID or info.questLogIndex or i) -- ?
+		local displayQuestID = info.questID -- ?
+		return info.title, info.level, info.suggestedGroup, info.isHeader, info.isCollapsed, isComplete, info.frequency, info.questID, info.startEvent, displayQuestID, info.isOnMap, info.hasLocalPOI, info.isTask, info.isBounty, info.isStory, info.isHidden, info.isScaling
+	end
+end
+local GetQuestLogSelection = GetQuestLogSelection or C_QuestLog.GetSelectedQuest
+local SelectQuestLogEntry = SelectQuestLogEntry or function(i) local id = i local info = C_QuestLog.GetInfo(i) if info then id = info.questID end C_QuestLog.SetSelectedQuest(id) C_QuestLog.ShouldShowQuestRewards(id) end
+local IsQuestWatched = _G.IsQuestWatched or function(i) local info = C_QuestLog.GetInfo(i) return info and C_QuestLog.GetQuestWatchType(info.questID) or nil end
+local GetQuestLogRequiredMoney = _G.GetQuestLogRequiredMoney or C_QuestLog.GetRequiredMoney
+
 local addonName = ...
-local MAX_LEVEL = MAX_PLAYER_LEVEL_TABLE[#MAX_PLAYER_LEVEL_TABLE]
+local MAX_LEVEL = GetMaxLevelForExpansionLevel(GetClampedCurrentExpansionLevel())
 
 local ns = CreateFrame("Frame")
 ns:SetScript("OnEvent", function(ns, event, ...) ns[event](ns, event, ...) end)
@@ -33,7 +48,7 @@ local config = defaults
 local manifest = {
 	{
 		-- default UI expbar
-		frame = "MainMenuExpBar",
+		frame = function() if MainMenuExpBar then return MainMenuExpBar end if StatusTrackingBarManager and ExpBarMixin then local bar for i = 1, #StatusTrackingBarManager.bars do local b = StatusTrackingBarManager.bars[i] if b.OnLoad == ExpBarMixin.OnLoad then bar = b break end end return bar end end,
 		level = 1,
 	},
 	{
@@ -246,13 +261,116 @@ do
 		popup.levelFrame.levelText:SetFormattedText("You've enough XP to ding level %d!", level)
 	end
 
+	local SOUND_CHEER_DB = {
+		Human = {
+			540628,
+			540610,
+			540694,
+			540707,
+		},
+		Orc = {
+			541328,
+			541320,
+			541435,
+			541404,
+		},
+		Dwarf = {
+			540014,
+			539977,
+			540024,
+			540070,
+		},
+		NightElf = {
+			541043,
+			541055,
+			541138,
+			541126,
+		},
+		Scourge = {
+			542697,
+			542691,
+			542783,
+			542781,
+		},
+		Tauren = {
+			542976,
+			542985,
+			543078,
+			543025,
+		},
+		Gnome = {
+			540434,
+			540445,
+			540493,
+			540463,
+		},
+		Troll = {
+			543253,
+			543277,
+			543331,
+			543330,
+		},
+		Goblin = {
+			541890,
+			542010,
+			541792,
+			541848,
+		},
+		BloodElf = {
+			1313578,
+			1313579,
+			1306474,
+			1306475,
+		},
+		Draenei = {
+			539598,
+			539601,
+			539735,
+			539639,
+		},
+		Worgen = {
+			542081,
+			542104,
+			542207,
+			542194,
+		},
+		Pandaren = {
+			636413,
+			636415,
+			630064,
+			630066,
+		},
+		Nightborne = "BloodElf",
+		HighmountainTauren = "Tauren",
+		VoidElf = "NightElf",
+		LightforgedDraenei = "Draenei",
+		ZandalariTroll = "Troll",
+		KulTiran = "Human",
+		DarkIronDwarf = "Dwarf",
+		Vulpera = "Goblin",
+		MagharOrc = "Orc",
+		Mechagnome = "Gnome",
+	}
+
+	local function PlayRandomCheer(race, gender)
+		local files = SOUND_CHEER_DB[race]
+		if not files then
+			return PlayRandomCheer(select(2, UnitFactionGroup("player")) == "Alliance" and "Human" or "Orc", gender)
+		end
+		if type(files) == "string" then
+			return PlayRandomCheer(files, gender)
+		end
+		local index = gender == 1 and random(1, 2) or random(3, 4)
+		local fileID = files[index] or files[1]
+		if fileID then
+			return PlaySoundFile(fileID, "Master")
+		end
+	end
+
 	local function Sound()
-		local _, race = UnitRace("player")
-		local gender = UnitSex("player") == 3 and "Female" or "Male"
-		local index = math.random(1, 2)
-		PlaySoundFile("Sound\\Interface\\LevelUp.ogg")
-		PlaySoundFile(format("Sound\\Character\\%s\\%sVocal%s\\%s%sCheer0%d.ogg", race, race, gender, race, gender, index))
-		PlaySoundFile("Sound\\Spells\\FX_HearthstoneVictoryStinger.ogg")
+		PlaySoundFile(567431, "Master")
+		PlayRandomCheer(select(2, UnitRace("player")), UnitSex("player") == 3 and 1 or 2)
+		PlaySoundFile(1068315, "Master")
 	end
 
 	function ns:PlayAlert(level)
@@ -294,9 +412,18 @@ end
 
 function ns:UpdateZone()
 	table.wipe(ns.zone)
-
-	for i = 1, QuestMapUpdateAllQuests(), 1 do
-		ns.zone[QuestPOIGetQuestIDByVisibleIndex(i)] = true
+	if QuestMapUpdateAllQuests then
+		QuestMapUpdateAllQuests()
+	end
+	local i = 0
+	while true do
+		i = i + 1
+		local id = (QuestPOIGetQuestIDByVisibleIndex or C_QuestLog.GetQuestIDForQuestWatchIndex)(i)
+		if not id then
+			break
+		end
+		ns.zone[id] = true
+		-- TODO: C_QuestLog.IsOnMap()
 	end
 end
 
@@ -320,7 +447,7 @@ function ns:CalculateExperience()
 
 		local title, level, suggestedGroup, isHeader, isCollapsed, isCompleted, frequency, questID, startEvent, displayQuestID, isOnMap, hasLocalPOI, isTask, isBounty, isStory, isHidden, isScaling = GetQuestLogTitle(index)
 		local isTracked, isRemote = IsQuestWatched(index), not ns.zone[questID]
-		isCompleted = (isCompleted and isCompleted > 0) or (GetNumQuestLeaderBoards(index) == 0 and playerMoney >= GetQuestLogRequiredMoney(index) and not startEvent)
+		isCompleted = isCompleted or (GetNumQuestLeaderBoards(index) == 0 and playerMoney >= GetQuestLogRequiredMoney(index) and not startEvent)
 
 		if isHeader then
 			header = title
@@ -520,7 +647,6 @@ function ns:ADDON_LOADED(event, name)
 			"PLAYER_XP_UPDATE",
 			"QUEST_LOG_UPDATE",
 			"QUEST_WATCH_LIST_CHANGED",
-			"SUPER_TRACKED_QUEST_CHANGED",
 			"UNIT_PORTRAIT_UPDATE",
 			"ZONE_CHANGED_NEW_AREA",
 		}
@@ -528,6 +654,9 @@ function ns:ADDON_LOADED(event, name)
 		if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
 			events[#events + 1] = "UNIT_ENTERED_VEHICLE"
 			events[#events + 1] = "UNIT_EXITED_VEHICLE"
+			if select(4, GetBuildInfo()) < 90000 then
+				events[#events + 1] = "SUPER_TRACKED_QUEST_CHANGED"
+			end
 		end
 
 		-- register events
@@ -538,8 +667,13 @@ function ns:ADDON_LOADED(event, name)
 		end
 
 		-- apply hooks
-		hooksecurefunc("AddQuestWatch", ns.ON_EVENT)
-		hooksecurefunc("RemoveQuestWatch", ns.ON_EVENT)
+		if AddQuestWatch then
+			hooksecurefunc("AddQuestWatch", ns.ON_EVENT)
+			hooksecurefunc("RemoveQuestWatch", ns.ON_EVENT)
+		else
+			hooksecurefunc(C_QuestLog, "AddQuestWatch", ns.ON_EVENT)
+			hooksecurefunc(C_QuestLog, "RemoveQuestWatch", ns.ON_EVENT)
+		end
 
 		-- experience bar
 		local hooked
