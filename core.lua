@@ -1,31 +1,15 @@
-if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then
-	return
-end
+if WOW_PROJECT_ID ~= WOW_PROJECT_MAINLINE then return end
 
--- TODO: 9.0
-local GetQuestLogTitle = _G.GetQuestLogTitle or function(i)
-	local info = C_QuestLog.GetInfo(i)
-	if info then
-		local _
-		local isComplete = C_QuestLog.IsComplete(info.questID or info.questLogIndex or i) -- ?
-		local displayQuestID = info.questID -- ?
-		return info.title, info.level, info.suggestedGroup, info.isHeader, info.isCollapsed, isComplete, info.frequency, info.questID, info.startEvent, displayQuestID, info.isOnMap, info.hasLocalPOI, info.isTask, info.isBounty, info.isStory, info.isHidden, info.isScaling
-	end
-end
-local GetQuestLogSelection = GetQuestLogSelection or C_QuestLog.GetSelectedQuest
-local SelectQuestLogEntry = SelectQuestLogEntry or function(i) local id = i local info = C_QuestLog.GetInfo(i) if info then id = info.questID end C_QuestLog.SetSelectedQuest(id) C_QuestLog.ShouldShowQuestRewards(id) end
-local IsQuestWatched = _G.IsQuestWatched or function(i) local info = C_QuestLog.GetInfo(i) return info and C_QuestLog.GetQuestWatchType(info.questID) or nil end
-local GetQuestLogRequiredMoney = _G.GetQuestLogRequiredMoney or C_QuestLog.GetRequiredMoney
+local addonName = ... ---@type string
+local MAX_LEVEL = GetMaxLevelForExpansionLevel(GetClampedCurrentExpansionLevel()) ---@diagnostic disable-line: undefined-global
 
-local addonName = ...
-local MAX_LEVEL = GetMaxLevelForExpansionLevel(GetClampedCurrentExpansionLevel())
+local ns = CreateFrame("Frame") ---@class AddOnFrame : Frame
+ns:SetScript("OnEvent", function(self, event, ...) self[event](self, event, ...) end)
+ns.loading = true ---@type boolean
+ns.bars = {} ---@type Manifest[]
+ns.zone = {} ---@type table<number, true|nil>
 
-local ns = CreateFrame("Frame")
-ns:SetScript("OnEvent", function(ns, event, ...) ns[event](ns, event, ...) end)
-ns.loading = true
-ns.bars = {}
-ns.zone = {}
-
+---@class Settings
 local defaults = {
 	-- true = only include watched quests, false = all quests regardless if watched or not
 	watched = true,
@@ -43,13 +27,36 @@ local defaults = {
 	color = {0, 1, 0, 1},
 }
 
+---@type Settings
 local config = defaults
 
+---@class Manifest
+---@field public frame string|fun():StatusBar
+---@field public level? number
+---@field public hooked? boolean
+---@field public widget StatusBar
+---@field public statusbar StatusBar
+
+---@type Manifest[]
 local manifest = {
 	{
 		-- default UI expbar
-		frame = function() if MainMenuExpBar then return MainMenuExpBar end if StatusTrackingBarManager and ExpBarMixin then local bar for i = 1, #StatusTrackingBarManager.bars do local b = StatusTrackingBarManager.bars[i] if b.OnLoad == ExpBarMixin.OnLoad then bar = b break end end return bar end end,
 		level = 1,
+		frame = function()
+			local MainMenuExpBar = _G.MainMenuExpBar ---@diagnostic disable-line: undefined-field
+			if MainMenuExpBar then
+				return MainMenuExpBar
+			end
+			local StatusTrackingBarManager = _G.StatusTrackingBarManager ---@diagnostic disable-line: undefined-field
+			local ExpBarMixin = _G.ExpBarMixin ---@diagnostic disable-line: undefined-field
+			if StatusTrackingBarManager and ExpBarMixin then
+				for _, bar in ipairs(StatusTrackingBarManager.bars) do
+					if bar.OnLoad == ExpBarMixin.OnLoad then
+						return bar
+					end
+				end
+			end
+		end,
 	},
 	{
 		-- BEB
@@ -57,7 +64,10 @@ local manifest = {
 	},
 	{
 		-- Dominos
-		frame = function() return type(Dominos) == "table" and type(Dominos.Frame) == "table" and type(Dominos.Frame.Get) == "function" and Dominos.Frame:Get("xp") end,
+		frame = function()
+			local Dominos = _G.Dominos ---@diagnostic disable-line: undefined-field
+			return type(Dominos) == "table" and type(Dominos.Frame) == "table" and type(Dominos.Frame.Get) == "function" and Dominos.Frame:Get("xp")
+		end,
 	},
 	{
 		-- saftXP_Backdrop
@@ -78,14 +88,20 @@ local manifest = {
 }
 
 do
-	local popup, last
+
+	local popup ---@class PopupFrame : Frame
+	local last ---@type number?
 
 	-- adapted LevelUpDisplay code to suit our purpose
 	do
+
 		local levelUpTexCoords = {
 			gLine = { 0.00195313, 0.81835938, 0.01953125, 0.03320313 },
 			gLineDelay = 1.5,
 		}
+
+		local ZoneTextFrame = _G.ZoneTextFrame ---@diagnostic disable-line: undefined-field
+		local SubZoneTextFrame = _G.SubZoneTextFrame ---@diagnostic disable-line: undefined-field
 
 		local scripts
 		scripts = {
@@ -143,7 +159,8 @@ do
 			end,
 		}
 
-		popup = CreateFrame("Frame", nil, UIParent)
+		---@diagnostic disable-next-line: assign-type-mismatch
+		popup = CreateFrame("Frame", nil, UIParent) ---@type PopupFrame
 		popup:SetPoint("TOP", 0, -190)
 		popup:SetSize(418, 72)
 		popup:SetFrameStrata("HIGH")
@@ -170,19 +187,19 @@ do
 		popup.blackBg:SetPoint("BOTTOM", 0, 0)
 		popup.blackBg:SetSize(326, 103)
 		popup.blackBg:SetTexture("Interface\\LevelUp\\LevelUpTex")
-		popup.blackBg:SetTexCoord(.00195313, .63867188, .03710938, .23828125)
-		popup.blackBg:SetVertexColor(1, 1, 1, .6)
+		popup.blackBg:SetTexCoord(0.00195313, 0.63867188, 0.03710938, 0.23828125)
+		popup.blackBg:SetVertexColor(1, 1, 1, 0.6)
 		popup.blackBg.grow = popup.blackBg:CreateAnimationGroup()
 		popup.blackBg.grow.anim1 = popup.blackBg.grow:CreateAnimation("Scale")
-		popup.blackBg.grow.anim1:SetScale(1, .001)
+		popup.blackBg.grow.anim1:SetScale(1, 0.001)
 		popup.blackBg.grow.anim1:SetDuration(0)
 		popup.blackBg.grow.anim1:SetStartDelay(levelUpTexCoords.gLineDelay)
 		popup.blackBg.grow.anim1:SetOrder(1)
 		popup.blackBg.grow.anim1:SetOrigin("BOTTOM", 0, 0)
 		popup.blackBg.grow.anim2 = popup.blackBg.grow:CreateAnimation("Scale")
 		popup.blackBg.grow.anim2:SetScale(1, 1000)
-		popup.blackBg.grow.anim2:SetDuration(.15)
-		popup.blackBg.grow.anim2:SetStartDelay(.25)
+		popup.blackBg.grow.anim2:SetDuration(0.15)
+		popup.blackBg.grow.anim2:SetStartDelay(0.25)
 		popup.blackBg.grow.anim2:SetOrder(2)
 		popup.blackBg.grow.anim2:SetOrigin("BOTTOM", 0, 0)
 
@@ -193,7 +210,7 @@ do
 		popup.gLine2:SetTexCoord(unpack(levelUpTexCoords.gLine))
 		popup.gLine2.grow = popup.gLine2:CreateAnimationGroup()
 		popup.gLine2.grow.anim1 = popup.gLine2.grow:CreateAnimation("Scale")
-		popup.gLine2.grow.anim1:SetScale(.001, 1)
+		popup.gLine2.grow.anim1:SetScale(0.001, 1)
 		popup.gLine2.grow.anim1:SetDuration(0)
 		popup.gLine2.grow.anim1:SetStartDelay(levelUpTexCoords.gLineDelay)
 		popup.gLine2.grow.anim1:SetOrder(1)
@@ -209,7 +226,7 @@ do
 		popup.gLine:SetTexCoord(unpack(levelUpTexCoords.gLine))
 		popup.gLine.grow = popup.gLine:CreateAnimationGroup()
 		popup.gLine.grow.anim1 = popup.gLine.grow:CreateAnimation("Scale")
-		popup.gLine.grow.anim1:SetScale(.001, 1)
+		popup.gLine.grow.anim1:SetScale(0.001, 1)
 		popup.gLine.grow.anim1:SetDuration(0)
 		popup.gLine.grow.anim1:SetStartDelay(levelUpTexCoords.gLineDelay)
 		popup.gLine.grow.anim1:SetOrder(1)
@@ -228,13 +245,13 @@ do
 		popup.levelFrame.levelUp.anim1 = popup.levelFrame.levelUp:CreateAnimation("Alpha")
 		popup.levelFrame.levelUp.anim1:SetFromAlpha(0)
 		popup.levelFrame.levelUp.anim1:SetToAlpha(1)
-		popup.levelFrame.levelUp.anim1:SetDuration(.7)
+		popup.levelFrame.levelUp.anim1:SetDuration(0.7)
 		popup.levelFrame.levelUp.anim1:SetStartDelay(1.5)
 		popup.levelFrame.levelUp.anim1:SetOrder(1)
 		popup.levelFrame.levelUp.anim2 = popup.levelFrame.levelUp:CreateAnimation("Alpha")
 		popup.levelFrame.levelUp.anim2:SetFromAlpha(1)
 		popup.levelFrame.levelUp.anim2:SetToAlpha(0)
-		popup.levelFrame.levelUp.anim2:SetDuration(.5)
+		popup.levelFrame.levelUp.anim2:SetDuration(0.5)
 		popup.levelFrame.levelUp.anim2:SetStartDelay(1.5)
 		popup.levelFrame.levelUp.anim2:SetOrder(2)
 		popup.levelFrame.levelUp:SetScript("OnPlay", scripts.LevelUpPlay)
@@ -242,7 +259,7 @@ do
 
 		popup.levelFrame.levelText = popup.levelFrame:CreateFontString(nil, "ARTWORK", "GameFont_Gigantic")
 		popup.levelFrame.levelText:SetPoint("BOTTOM", 0, 5)
-		popup.levelFrame.levelText:SetTextColor(1, .82, 0)
+		popup.levelFrame.levelText:SetTextColor(1, 0.82, 0)
 		popup.levelFrame.levelText:SetJustifyH("CENTER")
 
 		popup.levelFrame.reachedText = popup.levelFrame:CreateFontString(nil, "ARTWORK", "SystemFont_Shadow_Large")
@@ -253,8 +270,10 @@ do
 
 		popup.levelFrame.blockText = popup.levelFrame:CreateFontString(nil, "ARTWORK", "GameFontNormalHuge")
 		popup.levelFrame.blockText:SetPoint("CENTER", 0, -4)
+
 	end
 
+	---@param level number
 	local function Popup(level)
 		popup:PlayBanner()
 		popup.levelFrame.reachedText:SetText("Good News")
@@ -350,12 +369,16 @@ do
 		Vulpera = "Goblin",
 		MagharOrc = "Orc",
 		Mechagnome = "Gnome",
+		Dracthyr = "Human",
 	}
 
+	---@param race string
+	---@param gender number
 	local function PlayRandomCheer(race, gender)
 		local files = SOUND_CHEER_DB[race]
 		if not files then
-			return PlayRandomCheer(select(2, UnitFactionGroup("player")) == "Alliance" and "Human" or "Orc", gender)
+			local _, faction = UnitFactionGroup("player")
+			return PlayRandomCheer(faction == "Alliance" and "Human" or "Orc", gender)
 		end
 		if type(files) == "string" then
 			return PlayRandomCheer(files, gender)
@@ -368,12 +391,15 @@ do
 	end
 
 	local function Sound()
+		local _, race = UnitRace("player")
 		PlaySoundFile(567431, "Master")
-		PlayRandomCheer(select(2, UnitRace("player")), UnitSex("player") == 3 and 1 or 2)
+		PlayRandomCheer(race, UnitSex("player") == 3 and 1 or 2)
 		PlaySoundFile(1068315, "Master")
 	end
 
+	---@param level number
 	function ns:PlayAlert(level)
+
 		-- sanity check if there is a point to all this or not
 		if not config.popup and not config.sound then
 			return false
@@ -407,18 +433,18 @@ do
 		-- start cooldown period
 		last = GetTime()
 		return true
+
 	end
+
 end
 
 function ns:UpdateZone()
 	table.wipe(ns.zone)
-	if QuestMapUpdateAllQuests then
-		QuestMapUpdateAllQuests()
-	end
+	QuestMapUpdateAllQuests()
 	local i = 0
 	while true do
 		i = i + 1
-		local id = (QuestPOIGetQuestIDByVisibleIndex or C_QuestLog.GetQuestIDForQuestWatchIndex)(i)
+		local id = C_QuestLog.GetQuestIDForQuestWatchIndex(i)
 		if not id then
 			break
 		end
@@ -428,41 +454,52 @@ function ns:UpdateZone()
 end
 
 function ns:CalculateExperience()
-	if ns.loading then return 0 end -- loading screen makes calculating values go weird
+
+	-- loading screen makes calculating values go weird
+	if ns.loading then return 0 end
 
 	local experience = 0
-
 	local playerMoney = GetMoney()
-	local backupIndex = GetQuestLogSelection()
-	local index, header = 1
+	local backupQuestID = C_QuestLog.GetSelectedQuest()
+	local index = 1
+	local header ---@type string?
 
 	-- updates what quests are for the current zone
-	if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-		ns:UpdateZone()
-	end
+	ns:UpdateZone()
 
 	-- iterate over the quests
-	while GetQuestLogTitle(index) do
-		SelectQuestLogEntry(index)
+	repeat
 
-		local title, level, suggestedGroup, isHeader, isCollapsed, isCompleted, frequency, questID, startEvent, displayQuestID, isOnMap, hasLocalPOI, isTask, isBounty, isStory, isHidden, isScaling = GetQuestLogTitle(index)
-		local isTracked, isRemote = IsQuestWatched(index), not ns.zone[questID]
-		isCompleted = isCompleted or (GetNumQuestLeaderBoards(index) == 0 and playerMoney >= GetQuestLogRequiredMoney(index) and not startEvent)
+		local questInfo = C_QuestLog.GetInfo(index)
+		if not questInfo then break end
 
-		if isHeader then
-			header = title
-		elseif (config.bonus and isTask) or ((not config.watched or isTracked) and (config.remote or not isRemote) and (config.incomplete or isCompleted)) then
+		C_QuestLog.SetSelectedQuest(questInfo.questID)
+		C_QuestLog.ShouldShowQuestRewards(questInfo.questID)
+
+		local isTracked = C_QuestLog.GetQuestWatchType(questInfo.questID)
+		local isRemote = not ns.zone[questInfo.questID]
+		local isCompleted = C_QuestLog.IsComplete(questInfo.questID) or (GetNumQuestLeaderBoards(index) == 0 and playerMoney >= C_QuestLog.GetRequiredMoney(questInfo.questID) and not questInfo.startEvent)
+
+		if questInfo.isHeader then
+			header = questInfo.title
+		elseif (config.bonus and questInfo.isTask) or ((not config.watched or isTracked) and (config.remote or not isRemote) and (config.incomplete or isCompleted)) then
 			experience = experience + (GetQuestLogRewardXP() or 0)
 		end
 
 		index = index + 1
-	end
-	SelectQuestLogEntry(backupIndex)
 
+	until false
+
+	-- restore the original quest selection
+	C_QuestLog.SetSelectedQuest(backupQuestID)
+	C_QuestLog.ShouldShowQuestRewards(backupQuestID)
+
+	-- calculate experience differences due to quest experience pool
 	local currentXP = UnitXP("player")
 	local maxXP = UnitXPMax("player")
 
 	if currentXP >= 0 and maxXP > 0 then
+
 		local diff = maxXP - currentXP
 		local canLevel = experience >= diff
 		local percent
@@ -472,11 +509,14 @@ function ns:CalculateExperience()
 		end
 
 		return experience, canLevel, percent
+
 	end
 
 	return experience
+
 end
 
+---@param entry Manifest
 function ns:UpdateEntry(entry)
 	local experience = ns:CalculateExperience()
 	local widget = entry.widget
@@ -503,10 +543,7 @@ function ns:UpdateEntry(entry)
 end
 
 function ns:UpdateBars()
-	for i = 1, #manifest do
-		local entry = manifest[i]
-
-		-- update hooked bars
+	for _, entry in ipairs(manifest) do
 		if entry.hooked then
 			ns:UpdateEntry(entry)
 		end
@@ -517,30 +554,25 @@ function ns:IsWidget(widget, specific)
 	return type(widget) == "table" and type(widget.GetObjectType) == "function" and (type(specific) ~= "string" or widget:GetObjectType() == specific)
 end
 
+---@param entry Manifest
+---@param widget StatusBar
 function ns:SetupBar(entry, widget)
 	entry.widget = widget
-
 	entry.statusbar = CreateFrame("StatusBar", nil, widget)
 	entry.statusbar:SetAllPoints()
-
 	table.insert(ns.bars, entry)
 end
 
 function ns:ScanBars()
-	for i = 1, #manifest do
-		local entry = manifest[i]
-
-		-- skip hooked bars
+	for _, entry in pairs(manifest) do
 		if not entry.hooked then
-			local frame
-
+			local frame ---@type StatusBar?
 			-- find the statusbar frame
 			if type(entry.frame) == "function" then
 				frame = entry.frame()
 			elseif type(entry.frame) == "string" then
 				frame = _G[entry.frame]
 			end
-
 			-- validate and setup
 			if type(frame) == "table" and type(frame.GetObjectType) == "function" and frame:GetObjectType() == "StatusBar" then
 				ns:SetupBar(entry, frame)
@@ -552,17 +584,18 @@ end
 
 function ns:DisableAddOn()
 	ns:UnregisterAllEvents()
-	ns:SetScript("OnEvent", nil)
-
-	for i = 1, #ns.bars do
-		ns.bars[i].statusbar:Hide()
+	ns:SetScript("OnEvent", nil) ---@diagnostic disable-line: param-type-mismatch
+	for _, bar in ipairs(ns.bars) do
+		bar.statusbar:Hide()
 	end
-
 	table.wipe(ns.zone)
 end
 
 function ns:ON_TOOLTIP()
-	if not GameTooltip:IsShown() then return end
+
+	if not GameTooltip:IsShown() then
+		return
+	end
 
 	local experience, canLevel, percent = ns:CalculateExperience()
 
@@ -588,9 +621,13 @@ function ns:ON_TOOLTIP()
 
 	GameTooltip:AddLine("\n" .. text)
 	GameTooltip:Show()
+
 end
 
+---@param event string
+---@param arg1 any
 function ns:ON_EVENT(event, arg1)
+
 	-- loading screen status
 	if event == "LOADING_SCREEN_ENABLED" then
 		ns.loading = true
@@ -628,12 +665,17 @@ function ns:ON_EVENT(event, arg1)
 			ns:PlayAlert(ns.level + 1)
 		end
 	end
+
 end
 
+---@param event string
+---@param name string
 function ns:ADDON_LOADED(event, name)
+
 	if name == addonName then
+
 		-- savedvariable
-		local variable = addonName .. "DB"
+		local variable = format("%sDB", addonName)
 		config = _G[variable] or config
 		_G[variable] = config
 
@@ -649,33 +691,25 @@ function ns:ADDON_LOADED(event, name)
 			"QUEST_WATCH_LIST_CHANGED",
 			"UNIT_PORTRAIT_UPDATE",
 			"ZONE_CHANGED_NEW_AREA",
+			-- TODO: DEPRECATED?
+			"UNIT_ENTERED_VEHICLE",
+			"UNIT_EXITED_VEHICLE",
+			"SUPER_TRACKED_QUEST_CHANGED",
 		}
-
-		if WOW_PROJECT_ID == WOW_PROJECT_MAINLINE then
-			events[#events + 1] = "UNIT_ENTERED_VEHICLE"
-			events[#events + 1] = "UNIT_EXITED_VEHICLE"
-			if select(4, GetBuildInfo()) < 90000 then
-				events[#events + 1] = "SUPER_TRACKED_QUEST_CHANGED"
-			end
-		end
 
 		-- register events
 		for i = 1, #events do
 			local temp = events[i]
 			ns[temp] = ns.ON_EVENT
-			ns:RegisterEvent(temp)
+			pcall(ns.RegisterEvent, ns, temp)
 		end
 
 		-- apply hooks
-		if AddQuestWatch then
-			hooksecurefunc("AddQuestWatch", ns.ON_EVENT)
-			hooksecurefunc("RemoveQuestWatch", ns.ON_EVENT)
-		else
-			hooksecurefunc(C_QuestLog, "AddQuestWatch", ns.ON_EVENT)
-			hooksecurefunc(C_QuestLog, "RemoveQuestWatch", ns.ON_EVENT)
-		end
+		hooksecurefunc(C_QuestLog, "AddQuestWatch", ns.ON_EVENT)
+		hooksecurefunc(C_QuestLog, "RemoveQuestWatch", ns.ON_EVENT)
 
 		-- experience bar
+		local StatusTrackingBarManager = _G.StatusTrackingBarManager ---@diagnostic disable-line: undefined-field
 		local hooked
 		hooksecurefunc(StatusTrackingBarManager, "AddBarFromTemplate", function(_, _, template)
 			if hooked or template ~= "ExpStatusBarTemplate" then return end
@@ -688,10 +722,12 @@ function ns:ADDON_LOADED(event, name)
 			ns:SetupBar(entry, xpbar.StatusBar)
 			entry.hooked = true
 		end)
+
 	end
 
 	-- scan for supported addons
 	ns:ScanBars()
+
 end
 
 -- get ready to rumble
