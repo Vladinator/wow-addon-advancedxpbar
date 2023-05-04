@@ -31,7 +31,7 @@ local defaults = {
 local config = defaults
 
 ---@class Manifest
----@field public frame string|fun():StatusBar
+---@field public frame string|fun():StatusBar|false|nil
 ---@field public level? number
 ---@field public hooked? boolean
 ---@field public widget StatusBar
@@ -49,7 +49,7 @@ local manifest = {
 			end
 			local StatusTrackingBarManager = _G.StatusTrackingBarManager ---@diagnostic disable-line: undefined-field
 			local ExpBarMixin = _G.ExpBarMixin ---@diagnostic disable-line: undefined-field
-			if StatusTrackingBarManager and ExpBarMixin then
+			if StatusTrackingBarManager and StatusTrackingBarManager.bars and ExpBarMixin then
 				for _, bar in ipairs(StatusTrackingBarManager.bars) do
 					if bar.OnLoad == ExpBarMixin.OnLoad then
 						return bar
@@ -566,7 +566,7 @@ end
 function ns:ScanBars()
 	for _, entry in pairs(manifest) do
 		if not entry.hooked then
-			local frame ---@type StatusBar?
+			local frame ---@type StatusBar|false|nil
 			-- find the statusbar frame
 			if type(entry.frame) == "function" then
 				frame = entry.frame()
@@ -574,7 +574,7 @@ function ns:ScanBars()
 				frame = _G[entry.frame]
 			end
 			-- validate and setup
-			if type(frame) == "table" and type(frame.GetObjectType) == "function" and frame:GetObjectType() == "StatusBar" then
+			if frame and type(frame) == "table" and type(frame.GetObjectType) == "function" and frame:GetObjectType() == "StatusBar" then
 				ns:SetupBar(entry, frame)
 				entry.hooked = true
 			end
@@ -624,7 +624,7 @@ function ns:ON_TOOLTIP()
 
 end
 
----@param event string
+---@param event WowEvent
 ---@param arg1 any
 function ns:ON_EVENT(event, arg1)
 
@@ -668,11 +668,11 @@ function ns:ON_EVENT(event, arg1)
 
 end
 
----@param event string
+---@param event WowEvent
 ---@param name string
 function ns:ADDON_LOADED(event, name)
 
-	if name == addonName then
+	if event == "ADDON_LOADED" and name == addonName then
 
 		-- savedvariable
 		local variable = format("%sDB", addonName)
@@ -707,21 +707,51 @@ function ns:ADDON_LOADED(event, name)
 		-- apply hooks
 		hooksecurefunc(C_QuestLog, "AddQuestWatch", ns.ON_EVENT)
 		hooksecurefunc(C_QuestLog, "RemoveQuestWatch", ns.ON_EVENT)
+		if C_QuestLog.AddWorldQuestWatch then hooksecurefunc(C_QuestLog, "AddWorldQuestWatch", ns.ON_EVENT) end
+		if C_QuestLog.RemoveWorldQuestWatch then hooksecurefunc(C_QuestLog, "RemoveWorldQuestWatch", ns.ON_EVENT) end
 
 		-- experience bar
 		local StatusTrackingBarManager = _G.StatusTrackingBarManager ---@diagnostic disable-line: undefined-field
-		local hooked
-		hooksecurefunc(StatusTrackingBarManager, "AddBarFromTemplate", function(_, _, template)
-			if hooked or template ~= "ExpStatusBarTemplate" then return end
-			hooked = 1
-			local bars = StatusTrackingBarManager.bars
-			local xpbar = bars[#bars] -- it's always added at the end when this is called
-			hooksecurefunc(xpbar.ExhaustionTick, "ExhaustionToolTipText", ns.ON_TOOLTIP)
-			xpbar.ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
-			local entry = manifest[1] -- we keep the main xp bar on top of the manifest
-			ns:SetupBar(entry, xpbar.StatusBar)
-			entry.hooked = true
-		end)
+
+		if StatusTrackingBarManager then
+
+			local hooked ---@type boolean
+
+			local function HookStatusTrackingBarContainer(container)
+				if hooked or not container or type(container.StatusTrackingBarContainer_OnLoad) ~= "function" then
+					return
+				end
+				for _, xpbar in ipairs(container.bars) do
+					if xpbar and xpbar.ExhaustionTick and type(xpbar.ExhaustionTick) == "table" then
+						hooked = true
+						hooksecurefunc(xpbar.ExhaustionTick, "ExhaustionToolTipText", ns.ON_TOOLTIP)
+						xpbar.ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
+						local entry = manifest[1] -- we keep the main xp bar on top of the manifest
+						ns:SetupBar(entry, xpbar.StatusBar)
+						entry.hooked = true
+						break
+					end
+				end
+			end
+
+			HookStatusTrackingBarContainer(StatusTrackingBarManager.MainStatusTrackingBarContainer)
+			-- HookStatusTrackingBarContainer(StatusTrackingBarManager.SecondaryStatusTrackingBarContainer)
+
+			if type(StatusTrackingBarManager.AddBarFromTemplate) == "function" then
+				hooksecurefunc(StatusTrackingBarManager, "AddBarFromTemplate", function(_, _, template)
+					if hooked or template ~= "ExpStatusBarTemplate" then return end
+					hooked = true
+					local bars = StatusTrackingBarManager.bars
+					local xpbar = bars[#bars] -- it's always added at the end when this is called
+					hooksecurefunc(xpbar.ExhaustionTick, "ExhaustionToolTipText", ns.ON_TOOLTIP)
+					xpbar.ExhaustionTick:HookScript("OnEnter", ns.ON_TOOLTIP)
+					local entry = manifest[1] -- we keep the main xp bar on top of the manifest
+					ns:SetupBar(entry, xpbar.StatusBar)
+					entry.hooked = true
+				end)
+			end
+
+		end
 
 	end
 
