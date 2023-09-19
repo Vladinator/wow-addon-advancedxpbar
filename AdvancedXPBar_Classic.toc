@@ -1,9 +1,9 @@
-## Interface: 100105
+## Interface: 11403
 ## IconTexture: 894556
 ## Title: Advanced XP Bar
 ## Notes: Yet another AddOn making things slightly more useful!
 ## Author: Vladinator
-## Version: 10.1.5.230919
+## Version: 1.14.4.230919
 ## SavedVariables: AdvancedXPBarDB
 ## X-Curse-Project-ID: 73746
 ## X-WoWI-ID: 18342
