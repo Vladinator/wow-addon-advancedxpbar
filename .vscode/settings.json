@@ -1,5 +1,12 @@
 {
     "Lua.diagnostics.globals": [
-        "GameTooltip"
+        "GameTooltip",
+        "GetNumQuestLogEntries",
+        "GetQuestIDFromLogIndex",
+        "GetQuestLogRequiredMoney",
+        "GetQuestLogSelection",
+        "GetQuestLogTitle",
+        "SelectQuestLogEntry",
+        "StatusTrackingBarManager"
     ]
 }
