@@ -1,10 +1,12 @@
-## Interface: 30402
+## Interface: 40400
 ## IconTexture: 894556
 ## Title: Advanced XP Bar
 ## Notes: Yet another AddOn making things slightly more useful!
 ## Author: Vladinator
-## Version: 3.4.2.230919
+## Version: 4.4.0.240908
 ## SavedVariables: AdvancedXPBarDB
 ## X-Curse-Project-ID: 73746
 ## X-WoWI-ID: 18342
+## X-Wago-ID: J96EE26g
+## X-AddonProvider: github
 core.lua

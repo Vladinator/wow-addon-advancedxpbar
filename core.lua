@@ -1,12 +1,10 @@
 local addonName = ... ---@type string
-local MAX_LEVEL = GetMaxLevelForExpansionLevel(GetClampedCurrentExpansionLevel()) ---@diagnostic disable-line: undefined-global
 
 local GetQuestLogTitle = GetQuestLogTitle ---@type fun(questID: number): title: string, level: number, suggestedGroup: number, isHeader: boolean, isCollapsed: boolean, isComplete: boolean, frequency: number, questID: number, startEvent: boolean, displayQuestID: number, isOnMap: boolean, hasLocalPOI: boolean, isTask: boolean, isBounty: boolean, isStory: boolean, isHidden: boolean, isScaling: boolean
 local GetQuestLogRequiredMoney = GetQuestLogRequiredMoney ---@type fun(): requiredMoney: number
 local GetQuestLogSelection = GetQuestLogSelection ---@type fun(): index: number
 local SelectQuestLogEntry = SelectQuestLogEntry ---@type fun(index: number)
 local GetNumQuestLogEntries = GetNumQuestLogEntries ---@type fun(): numEntries: number, numQuests: number
-local GetQuestIDFromLogIndex = GetQuestIDFromLogIndex ---@type fun(index: number): questID: number
 
 ---@class QuestWatchListItemPolyfill
 ---@field public id number
@@ -513,17 +511,78 @@ do
 			630064,
 			630066,
 		},
-		Nightborne = "BloodElf",
-		HighmountainTauren = "Tauren",
-		VoidElf = "NightElf",
-		LightforgedDraenei = "Draenei",
-		ZandalariTroll = "Troll",
-		KulTiran = "Human",
-		DarkIronDwarf = "Dwarf",
-		Vulpera = "Goblin",
-		MagharOrc = "Orc",
-		Mechagnome = "Gnome",
-		Dracthyr = "Human",
+		Nightborne = {
+			1732019,
+			1732020,
+			1732395,
+			1732395,
+		},
+		HighmountainTauren = {
+			1730897,
+			1730898,
+			1730523,
+			1730524,
+		},
+		VoidElf = {
+			1732774,
+			1732775,
+			1733152,
+			1733153,
+		},
+		LightforgedDraenei = {
+			1731271,
+			1731272,
+			1731645,
+			1731646,
+		},
+		ZandalariTroll = {
+			1903036,
+			1903037,
+			1903509,
+			1903510,
+		},
+		KulTiran = {
+			2531190,
+			2531191,
+			2491885,
+			2491886,
+		},
+		DarkIronDwarf = {
+			1902017,
+			1902018,
+			1902530,
+			1902531,
+		},
+		Vulpera = {
+			3106239,
+			3106240,
+			3106704,
+			3106705,
+		},
+		MagharOrc = {
+			1951430,
+			1951432,
+			1951431,
+			1951433,
+		},
+		Mechagnome = {
+			3107638,
+			3107639,
+			3107169,
+			3107170,
+		},
+		Dracthyr = {
+			4739493,
+			4739493,
+			4738559,
+			4738561,
+		},
+		EarthenDwarf = {
+			6021038,
+			6021039,
+			6021057,
+			6021058,
+		},
 	}
 
 	---@param race string
@@ -560,7 +619,7 @@ do
 		end
 
 		-- sanity check the level range
-		if type(level) ~= "number" or level < 2 or level > MAX_LEVEL then
+		if type(level) ~= "number" or level < 2 or level > GetMaxLevelForPlayerExpansion() then
 			return false
 		end
 
@@ -818,7 +877,7 @@ function ns:ON_EVENT(event, arg1)
 	ns.ready = ns.ready or event == "PLAYER_ENTERING_WORLD"
 
 	-- disable the addon?
-	if ns.ready and ns.level >= MAX_LEVEL then
+	if ns.ready and ns.level >= GetMaxLevelForPlayerExpansion() then
 		return ns:DisableAddOn()
 	end
 
