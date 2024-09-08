@@ -7,6 +7,6 @@
 ## SavedVariables: AdvancedXPBarDB
 ## X-Curse-Project-ID: 73746
 ## X-WoWI-ID: 18342
-## X-Wago-ID: J96EE26g
+## X-Wago-ID: aN0Ye36j
 ## X-AddonProvider: github
 core.lua
