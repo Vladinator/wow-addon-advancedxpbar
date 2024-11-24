@@ -6,6 +6,9 @@ local GetQuestLogSelection = GetQuestLogSelection ---@type fun(): index: number
 local SelectQuestLogEntry = SelectQuestLogEntry ---@type fun(index: number)
 local GetNumQuestLogEntries = GetNumQuestLogEntries ---@type fun(): numEntries: number, numQuests: number
 
+-- mainline or classic_era
+local GetMaxLevel = GetMaxLevelForPlayerExpansion or GetEffectivePlayerMaxLevel
+
 ---@class QuestWatchListItemPolyfill
 ---@field public id number
 ---@field public timer number
@@ -619,7 +622,7 @@ do
 		end
 
 		-- sanity check the level range
-		if type(level) ~= "number" or level < 2 or level > GetMaxLevelForPlayerExpansion() then
+		if type(level) ~= "number" or level < 2 or level > GetMaxLevel() then
 			return false
 		end
 
@@ -877,7 +880,7 @@ function ns:ON_EVENT(event, arg1)
 	ns.ready = ns.ready or event == "PLAYER_ENTERING_WORLD"
 
 	-- disable the addon?
-	if ns.ready and ns.level >= GetMaxLevelForPlayerExpansion() then
+	if ns.ready and ns.level >= GetMaxLevel() then
 		return ns:DisableAddOn()
 	end
 

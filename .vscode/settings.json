@@ -21,6 +21,7 @@
         "SelectQuestLogEntry",
         "GetNumQuestLogEntries",
         "StatusTrackingBarManager",
-        "StatusTrackingBarManager"
+        "StatusTrackingBarManager",
+        "GetEffectivePlayerMaxLevel"
     ]
 }
