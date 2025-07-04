@@ -21,7 +21,7 @@ local QuestLogUtil
 ---@class QuestLogUtil
 QuestLogUtil = {
 	SupportsQuestWatching = function()
-		return false
+		return C_QuestLog.GetQuestWatchType ~= nil
 	end,
 	---@param questQuery number
 	---@return number questIndex, number questID
@@ -80,6 +80,10 @@ QuestLogUtil = {
 					isLegendarySort = false,
 					overridesSortOrder = false,
 					useMinimalHeader = false,
+					isAbandonOnDisable = false,
+					isInternalOnly = false,
+					questClassification = Enum.QuestClassification.Normal,
+					sortAsNormalQuest = true,
 				}
 			end
 		end
@@ -188,6 +192,7 @@ local config = defaults
 
 ---@class Manifest
 ---@field public frame string|fun():StatusBar|false|nil
+---@field public strata? FrameStrata
 ---@field public level? number
 ---@field public hooked? boolean
 ---@field public widget? StatusBar
@@ -197,6 +202,7 @@ local config = defaults
 local manifest = {
 	{
 		-- default UI expbar
+		strata = "LOW",
 		level = 1,
 		frame = function()
 			local MainMenuExpBar = _G.MainMenuExpBar ---@diagnostic disable-line: undefined-field
@@ -757,7 +763,7 @@ function ns:UpdateEntry(entry)
 	if not widget then return end
 	local statusbar = entry.statusbar
 	if not statusbar then return end
-	statusbar:SetFrameStrata(widget:GetFrameStrata())
+	statusbar:SetFrameStrata(entry.strata or widget:GetFrameStrata())
 	statusbar:SetFrameLevel(max(widget:GetFrameLevel() + (entry.level or -1), 0))
 	statusbar:SetSize(widget:GetSize())
 	statusbar:SetStatusBarTexture(widget:GetStatusBarTexture() or config.texture)
@@ -841,11 +847,11 @@ function ns:ON_TOOLTIP()
 
 	local text = {}
 	text[#text + 1] = format("|cffFFD200%s|r", addonName)
-	text[#text + 1] = format("|cffFFFFFFYou are at %d%% XP. You require %d%% XP to level %d.", currentPercent, 100 - currentPercent, ns.level + 1)
-	text[#text + 1] = format("You need to fill up %d bars of XP.", requiredBarsPercent)
+	text[#text + 1] = format("|cffFFFFFFYou are at %d%% XP", currentPercent)
+	text[#text + 1] = format("|cffFFFFFFYou require %d%% XP to level %d (%d bars)", 100 - currentPercent, ns.level + 1, requiredBarsPercent)
 
 	if experience > 0 then
-		text[#text + 1] = format("Your quest log is worth %d XP.", experience)
+		text[#text + 1] = format("Your quest log is worth %d XP", experience)
 
 		if percent and percent <= 1 then
 			text[#text] = format("%s (%d%% of remaining XP)", text[#text], ceil(percent * 100))
@@ -989,6 +995,12 @@ function ns:ADDON_LOADED(event, name)
 				end)
 			end
 
+		end
+
+		-- classic flavored experience bar
+		local MainMenuExpBar = _G.MainMenuExpBar ---@diagnostic disable-line: undefined-field
+		if MainMenuExpBar then
+			MainMenuExpBar:HookScript("OnEnter", ns.ON_TOOLTIP)
 		end
 
 	end
