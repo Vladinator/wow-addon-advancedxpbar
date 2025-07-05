@@ -848,7 +848,7 @@ function ns:ON_TOOLTIP()
 	local text = {}
 	text[#text + 1] = format("|cffFFD200%s|r", addonName)
 	text[#text + 1] = format("|cffFFFFFFYou are at %d%% XP", currentPercent)
-	text[#text + 1] = format("|cffFFFFFFYou require %d%% XP to level %d (%d bars)", 100 - currentPercent, ns.level + 1, requiredBarsPercent)
+	text[#text + 1] = format("|cffFFFFFFYou require %d%% XP to level %d (%.1f bars)", 100 - currentPercent, ns.level + 1, requiredBarsPercent)
 
 	if experience > 0 then
 		text[#text + 1] = format("Your quest log is worth %d XP", experience)
@@ -859,9 +859,6 @@ function ns:ON_TOOLTIP()
 	end
 
 	if canLevel then
-		text[#text + 1] = "|r"
-		text[#text + 1] = ""
-		text[#text + 1] = ""
 		text[#text + 1] = format("|cff00FF00You will level up if you deliver your %s quests!", config.incomplete and "current" or "completed")
 	end
 
