@@ -281,8 +281,8 @@ do
 				popup.levelFrame.levelUp:Stop()
 				popup:Hide()
 			end,
-			ResumeBanner = function(...)
-				scripts.PlayBanner(...)
+			ResumeBanner = function()
+				scripts.PlayBanner()
 			end,
 			PopupShow = function()
 				popup.levelFrame.reachedText:SetText("")
@@ -300,8 +300,8 @@ do
 
 				popup.levelFrame.levelUp:Play()
 			end,
-			PopupEvent = function(...)
-				scripts.StopBanner(...)
+			PopupEvent = function()
+				scripts.StopBanner()
 			end,
 			AnimOutFinished = function()
 				popup:Hide()
@@ -828,7 +828,9 @@ function ns:DisableAddOn()
 	ns:UnregisterAllEvents()
 	ns:SetScript("OnEvent", nil)
 	for _, bar in ipairs(ns.bars) do
-		bar.statusbar:Hide()
+		if bar.statusbar then
+			bar.statusbar:Hide()
+		end
 	end
 	table.wipe(ns.zone)
 end
